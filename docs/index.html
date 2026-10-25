@@ -53,7 +53,7 @@ ACTIONS (in order; BlastRadius never runs these for you):
   <!-- ===== TALLY EMBED PLACEHOLDER =====
        Replace TALLY_FORM_ID (one place: the data-form-id attribute below) with the real Tally form ID,
        e.g. data-form-id="wA1bC2". Until then the page shows a "coming soon" note and loads nothing from Tally. -->
-  <div id="tally-waitlist" data-form-id="TALLY_FORM_ID">
+  <div id="tally-waitlist" data-form-id="OQQDr7">
     <iframe id="tally-frame" title="BlastRadius waitlist" width="100%" height="320" frameborder="0" marginheight="0" marginwidth="0" loading="lazy" hidden></iframe>
     <p id="tally-pending" class="muted">The waitlist form is coming soon.</p>
   </div>
@@ -70,7 +70,7 @@ ACTIONS (in order; BlastRadius never runs these for you):
 <script>
 (function(){var w=document.getElementById('tally-waitlist'),id=w.getAttribute('data-form-id');
 if(!id||id==='TALLY_FORM_ID')return; /* placeholder: no request to Tally */
-var f=document.getElementById('tally-frame');f.setAttribute('data-tally-src','https://tally.so/embed/'+encodeURIComponent(id)+'?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1');f.hidden=false;document.getElementById('tally-pending').hidden=true;
+var f=document.getElementById('tally-frame');f.setAttribute('data-tally-src','https://tally.so/embed/'+encodeURIComponent(id)+'?price_shown=9&alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1');f.hidden=false;document.getElementById('tally-pending').hidden=true;
 var s=document.createElement('script');s.src='https://tally.so/widgets/embed.js';s.onload=function(){if(window.Tally)Tally.loadEmbeds();else f.src=f.getAttribute('data-tally-src');};s.onerror=function(){f.src=f.getAttribute('data-tally-src');};document.body.appendChild(s);})();
 </script>
 </body>

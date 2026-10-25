@@ -1,0 +1,44 @@
+== distro: Ubuntu 24.04.5 LTS
+PASS AT-1.1 clean host: VERDICT OK, exit 0, no file changed outside TMPDIR
+PASS AT-1.2 completes with --network none (no outbound calls needed)
+PASS AT-3.4 Go/rustls advisory note printed
+PASS AT-4.4 reports package manager dpkg
+PASS AT-8.1 header shows --definitions version/published_at
+PASS AT-1.x no temp dirs left behind
+PASS AT-8.4 no --definitions: uses bundled defs and prints version (signature OK)
+     real bundled defs on clean ubuntu image -> VERDICT: OK (exit 0)
+PASS AT-8.2 one changed byte -> exit 2 'definitions signature invalid'
+PASS AT-8.3 schema-invalid defs -> exit 2 naming field
+PASS AT-8.x missing .sig -> exit 2
+PASS AT-8.y defs signed by a key other than the embedded one -> exit 2
+PASS AT-2.1 below fixed: path, version, SAPI cli, AFFECTED
+PASS AT-2.5 distro suffix 9.1.10-1~deb12u1 compared on upstream part
+PASS AT-2.2 exactly at fixed version -> NOT AFFECTED
+PASS AT-2.3 cli and fpm listed separately
+PASS AT-2.4 uncovered branch -> UNKNOWN (branch not covered)
+PASS AT-7.2a PATCH FIRST -> exit 20
+PASS AT-6.4 actions show remediation.dpkg word for word
+PASS AT-6.5 same facts twice -> byte-identical apart from timestamp
+PASS AT-3.1 only venvA certifi AFFECTED, full path
+PASS AT-1.3 unreadable file -> UNKNOWN (permission denied: path), run completes
+PASS AT-4.1 system bundle with test root -> os_ca AFFECTED + bundle path
+PASS AT-4.5 ca_info root present in bundle -> NOTE only, never ROTATE/PATCH, no actions
+PASS AT-4.3 root absent but package < fixed -> NOT AFFECTED + 'package older than fixed version'
+PASS AT-4.2 root absent, package >= fixed -> NOT AFFECTED, no note
+PASS AT-3.2b cacerts present, keytool absent -> UNKNOWN (keytool not found)
+PASS AT-5.1 nginx-referenced leaf under distrusted intermediate -> AFFECTED with path, config, CN, expiry
+PASS AT-5.2 unreferenced letsencrypt leaf on good CA -> NOT AFFECTED, unreferenced
+PASS AT-5.3a leaf-only, issuer name matches distrusted root -> AFFECTED
+PASS AT-5.3b leaf-only, unknown issuer -> UNKNOWN (chain incomplete)
+PASS AT-5.5 Apache/HAProxy/Postfix references discovered
+PASS AT-5.4 private keys never parsed (only 64-byte header peek)
+PASS AT-6.1 runtime + CA matches -> PATCH FIRST, action 1 runtime, action 2 CA
+PASS AT-6.2 only CA matches -> ROTATE FIRST, leaf reissue after store update
+PASS AT-6.3 no matches + UNKNOWNs -> VERDICT UNKNOWN, exit 30, reasons listed
+PASS AT-7.1 --json: stdout is exactly one valid JSON document
+PASS AT-7.3 hostname excluded unless --include-hostname
+PASS AT-7.3b --include-hostname adds hostname
+PASS AT-7.2b usage error -> exit 2
+     perf: 50 distinct certifi bundles x 120 certs + 200 leaf files: 15s
+PASS AT-1.4 50 bundles + 200 leaf files in < 30 s (took 15s)
+== RESULT ubuntu: 40 passed, 0 failed

@@ -1,0 +1,490 @@
+{
+  "schema": "blastradius-incidents/1",
+  "version": "0.2.0",
+  "published_at": "2026-10-26",
+  "notes": "Experiment-grade definitions. Every value carries a source. Values marked verified=false must be confirmed against primary sources before public release.",
+  "incidents": [
+    {
+      "id": "BR-2026-0001",
+      "title": "PHP2Shell: unauthenticated RCE in PHP (CVE-2026-109618, CVE-2026-109619)",
+      "kind": "runtime_cve",
+      "published_at": "2026-10-21",
+      "severity_rank": 1,
+      "cves": [
+        "CVE-2026-109618",
+        "CVE-2026-109619"
+      ],
+      "references": [
+        "https://www.php.net/archive/2026.php",
+        "https://news-web.php.net/php.announce/512",
+        "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp",
+        "https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/",
+        "https://cert.europa.eu/publications/security-advisories/2026-018",
+        "https://ubuntu.com/security/CVE-2026-109618",
+        "https://ubuntu.com/security/CVE-2026-109619",
+        "https://security-tracker.debian.org/tracker/CVE-2026-109618",
+        "https://security-tracker.debian.org/tracker/CVE-2026-109619",
+        "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109618.json",
+        "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109619.json",
+        "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+        "https://secdb.alpinelinux.org/"
+      ],
+      "verification": {
+        "verified": true,
+        "how": "Fixed versions 8.5.12/8.4.27/8.3.36/8.2.35 match experiment.md and were cross-checked on 2026-10-26 against GHSA-6wmf-4rv5-p3rp 'Patched versions', the php.net 2026 news archive, the PHP Foundation post and CERT-EU 2026-018. Branches <= 8.1 are EOL and get no upstream fix (CERT-EU). Affected SAPIs: advisories describe mod_php (unauthenticated, default settings) and PHP-FPM (via app code paths); CLI is reported for completeness. Distro backported fixes are modelled by distro_package_fixed rows sourced from the Ubuntu, Debian, Red Hat and Rocky trackers and the Alpine secdb on 2026-10-26. Gaps (no tracker row in definitions): RHEL php:8.2/8.3 module NEVRAs (RHSA-2026:87072/87079/87073/87080 exist but the NEVRA was not copied), RHEL9 php:8.4 still 'Affected' with no fix, AlmaLinux/CentOS/Oracle not sourced, Ubuntu 18.04 and older ESM-only, Alpine 3.20 and older have no secdb entry (upstream comparison is used for Alpine)."
+      },
+      "rules": [
+        {
+          "type": "version_below",
+          "component": "php",
+          "branch": "8.5",
+          "fixed_version": "8.5.12"
+        },
+        {
+          "type": "version_below",
+          "component": "php",
+          "branch": "8.4",
+          "fixed_version": "8.4.27"
+        },
+        {
+          "type": "version_below",
+          "component": "php",
+          "branch": "8.3",
+          "fixed_version": "8.3.36"
+        },
+        {
+          "type": "version_below",
+          "component": "php",
+          "branch": "8.2",
+          "fixed_version": "8.2.35"
+        },
+        {
+          "type": "eol_branch",
+          "component": "php",
+          "branch_max": "8.1"
+        },
+        {
+          "type": "distro_package_fixed",
+          "note": "Matched on os_id + release + owning package (or its binary subpackages, prefix \"<package>-\") + upstream branch. Checked before upstream rules. On backport distros (ubuntu, rhel, rocky, almalinux, centos, ol) a package-managed PHP with no matching row is UNKNOWN (needs verification), never guessed.",
+          "fixes": [
+            {
+              "os_id": "ubuntu",
+              "os_release": "24.04",
+              "package": "php8.3",
+              "branch": "8.3",
+              "fixed_version": "8.3.6-0ubuntu0.24.04.13",
+              "advisory": "Ubuntu CVE tracker (noble php8.3)",
+              "source": "https://ubuntu.com/security/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "ubuntu",
+              "os_release": "22.04",
+              "package": "php8.1",
+              "branch": "8.1",
+              "fixed_version": "8.1.2-1ubuntu2.28",
+              "advisory": "Ubuntu CVE tracker (jammy php8.1)",
+              "source": "https://ubuntu.com/security/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "ubuntu",
+              "os_release": "26.04",
+              "package": "php8.5",
+              "branch": "8.5",
+              "fixed_version": "8.5.4-0ubuntu1.5",
+              "advisory": "Ubuntu CVE tracker (resolute php8.5)",
+              "source": "https://ubuntu.com/security/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "ubuntu",
+              "os_release": "20.04",
+              "package": "php7.4",
+              "branch": "7.4",
+              "fixed_version": "7.4.3-4ubuntu2.29+esm5",
+              "advisory": "Ubuntu CVE tracker (focal php7.4, Ubuntu Pro/ESM only)",
+              "source": "https://ubuntu.com/security/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "debian",
+              "os_release": "12",
+              "package": "php8.2",
+              "branch": "8.2",
+              "fixed_version": "8.2.35-1~deb12u1",
+              "advisory": "Debian tracker bookworm, DLA-4848-1",
+              "source": "https://security-tracker.debian.org/tracker/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "debian",
+              "os_release": "13",
+              "package": "php8.4",
+              "branch": "8.4",
+              "fixed_version": "8.4.27-1~deb13u1",
+              "advisory": "Debian tracker trixie, DSA-6574-1",
+              "source": "https://security-tracker.debian.org/tracker/CVE-2026-109618 (and CVE-2026-109619: same data)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rhel",
+              "os_release": "9",
+              "package": "php",
+              "branch": "8.0",
+              "fixed_version": "8.0.30-8.el9_8.1",
+              "advisory": "RHSA-2026:87151",
+              "source": "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109618.json (and CVE-2026-109619)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rhel",
+              "os_release": "10",
+              "package": "php",
+              "branch": "8.3",
+              "fixed_version": "8.3.36-1.el10_2",
+              "advisory": "RHSA-2026:87070",
+              "source": "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109618.json (and CVE-2026-109619)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rhel",
+              "os_release": "10",
+              "package": "php8.4",
+              "branch": "8.4",
+              "fixed_version": "8.4.27-1.el10_2",
+              "advisory": "RHSA-2026:87071",
+              "source": "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109618.json (and CVE-2026-109619)",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "9",
+              "package": "php",
+              "branch": "8.0",
+              "fixed_version": "8.0.30-8.el9_8.1",
+              "advisory": "RLSA-2026:87151",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "9",
+              "package": "php",
+              "branch": "8.2",
+              "fixed_version": "8.2.35-1.module+el9.8.0+40395+2f706e64",
+              "advisory": "RLSA-2026:87072 (php:8.2 module)",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "9",
+              "package": "php",
+              "branch": "8.3",
+              "fixed_version": "8.3.36-1.module+el9.8.0+40396+4e680bb7",
+              "advisory": "RLSA-2026:87079 (php:8.3 module)",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "10",
+              "package": "php",
+              "branch": "8.3",
+              "fixed_version": "8.3.36-1.el10_2",
+              "advisory": "RLSA-2026:87070",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "8",
+              "package": "php",
+              "branch": "8.2",
+              "fixed_version": "8.2.35-1.module+el8.10.0+40394+d21b33fb",
+              "advisory": "RLSA-2026:87073 (php:8.2 module)",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "rocky",
+              "os_release": "8",
+              "package": "php",
+              "branch": "7.4",
+              "fixed_version": "7.4.33-8.module+el8.10.0+40393+c071e357",
+              "advisory": "RLSA-2026:87080 (php:7.4 module)",
+              "source": "https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "alpine",
+              "os_release": "3.21",
+              "package": "php82",
+              "branch": "8.2",
+              "fixed_version": "8.2.35-r0",
+              "advisory": "Alpine secdb v3.21",
+              "source": "https://secdb.alpinelinux.org/v3.21/community.json, v3.22/community.json",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "alpine",
+              "os_release": "3.22",
+              "package": "php82",
+              "branch": "8.2",
+              "fixed_version": "8.2.35-r0",
+              "advisory": "Alpine secdb v3.22",
+              "source": "https://secdb.alpinelinux.org/v3.21/community.json, v3.22/community.json",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "alpine",
+              "os_release": "3.22",
+              "package": "php83",
+              "branch": "8.3",
+              "fixed_version": "8.3.36-r0",
+              "advisory": "Alpine secdb v3.22",
+              "source": "https://secdb.alpinelinux.org/v3.21/community.json, v3.22/community.json",
+              "checked": "2026-10-26"
+            },
+            {
+              "os_id": "alpine",
+              "os_release": "3.22",
+              "package": "php84",
+              "branch": "8.4",
+              "fixed_version": "8.4.27-r0",
+              "advisory": "Alpine secdb v3.22",
+              "source": "https://secdb.alpinelinux.org/v3.21/community.json, v3.22/community.json",
+              "checked": "2026-10-26"
+            }
+          ]
+        }
+      ],
+      "remediation": {
+        "dpkg": [
+          "sudo apt-get update",
+          "sudo apt-get install --only-upgrade 'php*'",
+          "sudo systemctl restart 'php*-fpm' apache2 2>/dev/null || true"
+        ],
+        "rpm": [
+          "sudo dnf upgrade 'php*'",
+          "sudo systemctl restart php-fpm httpd 2>/dev/null || true"
+        ],
+        "apk": [
+          "sudo apk update",
+          "sudo apk upgrade 'php*'",
+          "sudo rc-service php-fpm83 restart 2>/dev/null || true"
+        ],
+        "any": [
+          "Upgrade PHP to >= 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35 (or your distro's patched build), then restart PHP-FPM and Apache. PHP <= 8.1 is EOL: move to a supported branch."
+        ]
+      }
+    },
+    {
+      "id": "BR-2026-0002",
+      "title": "eMudhra emSign ECC Root CA - G3 removed from Mozilla NSS (compromised intermediates, Oct 2026)",
+      "kind": "ca_distrust",
+      "published_at": "2026-10-21",
+      "severity_rank": 1,
+      "references": [
+        "https://blog.mozilla.org/security/2026/10/20/protecting-firefox-users-following-the-compromise-of-emudhra-intermediate-certificates/",
+        "https://bugzilla.mozilla.org/show_bug.cgi?id=2083449",
+        "https://bugzilla.mozilla.org/show_bug.cgi?id=2083709",
+        "https://archlinux.org/news/update-to-ca-certificates-mozilla-31311-1-to-prevent-man-in-the-middle-attacks/",
+        "https://emudhra.com/en/post/certificate-security-incident",
+        "https://bugzilla.mozilla.org/show_bug.cgi?id=2084101",
+        "https://ccadb.my.salesforce-sites.com/mozilla/RemovedCACertificateReportCSVFormat"
+      ],
+      "verification": {
+        "verified": true,
+        "how": "Checked 2026-10-26. (1) CCADB Mozilla 'Removed CA Certificate Report' lists 'emSign ECC Root CA - G3' (eMudhra Technologies Limited, serial 3CF607A968700EDA8B84) with SHA-256 86A1ECBA089C4A8D3BBE2734C612BA341D813E043CF9E8A862CD5C57A36BBE6B (matches our bundle-computed value), removal bug 2084101, NSS release when removed '3.132' (Mozilla blog / Arch news say 3.131.1; we report the discrepancy and do not use a version rule). (2) Bug 2084101 'Remove eMudhra emSign Root CA - G3 from NSS' (RESOLVED FIXED, nss rev 26d38a0c3fb8) blocks incident bug 2083449, so Mozilla's own records tie the G3 removal to the compromise. (3) Bug 2083449 comment 0 lists the 6 compromised TLS intermediates (fingerprints below) with issuer 'emSign Root TLS CA - G3'; that name is not in Mozilla's included or removed reports, so the exact path from these intermediates to emSign ECC Root CA - G3 (presumably a cross-sign) is NOT verified. Sectigo cross-signed copies of the intermediates exist (bug 2083449) but their full fingerprint list was not sourced. Fixed distro ca-certificates versions not verified except Arch."
+      },
+      "rules": [
+        {
+          "type": "cert_fingerprint_present",
+          "stores": [
+            "os_ca",
+            "certifi",
+            "java",
+            "leaf_chain"
+          ],
+          "certs": [
+            {
+              "label": "emSign ECC Root CA - G3",
+              "sha256": "86A1ECBA089C4A8D3BBE2734C612BA341D813E043CF9E8A862CD5C57A36BBE6B",
+              "verified": true,
+              "reason": "removed from NSS for this incident: CCADB removed report + Mozilla bug 2084101 (blocks 2083449)"
+            }
+          ]
+        },
+        {
+          "type": "cert_fingerprint_present",
+          "stores": [
+            "leaf_chain"
+          ],
+          "certs": [
+            {
+              "label": "EM EV TLS CA - G3B",
+              "sha256": "E7568FE6E12331F4FD7DE61DA4C7559D0F8EB192A218D4741A3BA75184333838",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            },
+            {
+              "label": "EM OV TLS CA - G3B",
+              "sha256": "98B896625C0C230ADEEC3EB2CF6AAD5001ECF9156A68644E82374CE5833BC25B",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            },
+            {
+              "label": "EM DV TLS CA - G3B",
+              "sha256": "42C4ACCD12C4F59597925E1A08A7A90102608543809308D50EC427E118BA1493",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            },
+            {
+              "label": "EM EV TLS CA - G3C",
+              "sha256": "432EC25F0D28DE9006D97BF752F17BBB2CD41F669933FCB072D9A1148D0261F3",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            },
+            {
+              "label": "EM OV TLS CA - G3C",
+              "sha256": "CB6E15165AC802E9B3F993F16C25D41F4E81C21EBDE71AE1B012AC00BF9C7C3F",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            },
+            {
+              "label": "EM DV TLS CA - G3C",
+              "sha256": "0164D7CEAE5BB909C272AF151FF44B1177AE9B47D9424B94F1D9558C30934D19",
+              "verified": true,
+              "reason": "compromised intermediate (caCompromise), Mozilla bug 2083449 comment 0"
+            }
+          ]
+        },
+        {
+          "type": "issuer_name_match",
+          "stores": [
+            "leaf"
+          ],
+          "issuer_cn": [
+            "emSign ECC Root CA - G3",
+            "emSign Root TLS CA - G3",
+            "EM EV TLS CA - G3B",
+            "EM OV TLS CA - G3B",
+            "EM DV TLS CA - G3B",
+            "EM EV TLS CA - G3C",
+            "EM OV TLS CA - G3C",
+            "EM DV TLS CA - G3C"
+          ]
+        }
+      ],
+      "remediation": {
+        "dpkg": [
+          "sudo apt-get update",
+          "sudo apt-get install --only-upgrade ca-certificates",
+          "sudo update-ca-certificates --fresh"
+        ],
+        "rpm": [
+          "sudo dnf upgrade ca-certificates",
+          "sudo update-ca-trust"
+        ],
+        "apk": [
+          "sudo apk update",
+          "sudo apk upgrade ca-certificates",
+          "sudo update-ca-certificates"
+        ],
+        "certifi": [
+          "<venv>/bin/pip install --upgrade certifi   # run for each listed virtualenv/site-packages"
+        ],
+        "java": [
+          "Upgrade the JDK/JRE package (or remove the alias with: keytool -delete -alias <alias> -keystore <cacerts>)"
+        ],
+        "leaf": [
+          "Reissue the listed certificate from a CA that does not chain to eMudhra/emSign, deploy it, reload the service"
+        ],
+        "any": [
+          "If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs."
+        ]
+      }
+    },
+    {
+      "id": "BR-2026-0003",
+      "title": "emSign Root CA - C1 / emSign ECC Root CA - C3 planned removal from Mozilla NSS (info only; not the compromise)",
+      "kind": "ca_info",
+      "published_at": "2026-10-21",
+      "severity_rank": 9,
+      "references": [
+        "https://bugzilla.mozilla.org/show_bug.cgi?id=2083709",
+        "https://emudhra.com/en/post/certificate-security-incident",
+        "https://ccadb.my.salesforce-sites.com/mozilla/RemovedCACertificateReportCSVFormat"
+      ],
+      "verification": {
+        "verified": true,
+        "how": "Fingerprints copied from Mozilla bug 2083709 and matched against Debian 12/Ubuntu 24.04/Alpine 3.20/Rocky 9 bundle copies on 2026-10-26. eMudhra and the bug say no TLS server certs were issued under these roots, so this is low urgency hygiene. Fixed distro ca-certificates versions not verified. Re-checked 2026-10-26 in the CCADB Mozilla 'Removed CA Certificate Report': both fingerprints match, removal bug 2083709, NSS 3.131. kind=ca_info: findings are reported as NOTE/INFO and never change the host verdict or exit code."
+      },
+      "rules": [
+        {
+          "type": "cert_fingerprint_present",
+          "stores": [
+            "os_ca",
+            "certifi",
+            "java",
+            "leaf_chain"
+          ],
+          "certs": [
+            {
+              "label": "emSign Root CA - C1",
+              "sha256": "125609AA301DA0A249B97A8239CB6A34216F44DCAC9F3954B14292F2E8C8608F",
+              "verified": true,
+              "reason": "planned removal, Mozilla bug 2083709"
+            },
+            {
+              "label": "emSign ECC Root CA - C3",
+              "sha256": "BC4D809B15189D78DB3E1D8CF4F9726A795DA1643CA5F1358E1DDB0EDC0D7EB3",
+              "verified": true,
+              "reason": "planned removal, Mozilla bug 2083709"
+            }
+          ]
+        },
+        {
+          "type": "issuer_name_match",
+          "stores": [
+            "leaf"
+          ],
+          "issuer_cn": [
+            "emSign Root CA - C1",
+            "emSign ECC Root CA - C3"
+          ]
+        }
+      ],
+      "remediation": {
+        "dpkg": [
+          "sudo apt-get update",
+          "sudo apt-get install --only-upgrade ca-certificates",
+          "sudo update-ca-certificates --fresh"
+        ],
+        "rpm": [
+          "sudo dnf upgrade ca-certificates",
+          "sudo update-ca-trust"
+        ],
+        "apk": [
+          "sudo apk update",
+          "sudo apk upgrade ca-certificates",
+          "sudo update-ca-certificates"
+        ],
+        "certifi": [
+          "<venv>/bin/pip install --upgrade certifi   # run for each listed virtualenv/site-packages"
+        ],
+        "java": [
+          "Upgrade the JDK/JRE package (or remove the alias with: keytool -delete -alias <alias> -keystore <cacerts>)"
+        ],
+        "leaf": [
+          "Reissue the listed certificate from a CA that does not chain to eMudhra/emSign, deploy it, reload the service"
+        ],
+        "any": [
+          "If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs."
+        ]
+      }
+    }
+  ]
+}

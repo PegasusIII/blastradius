@@ -1,0 +1,29 @@
+== real-world smoke: Rocky Linux 9.3 (Blue Onyx)
+BlastRadius 0.2.0-exp  (read-only; nothing on this host was changed)
+generated: 2026-10-25T21:32:52Z
+definitions: v0.2.0 published 2026-10-26 (bundled), signature OK
+host: os=rocky 9.3 pkg=rpm ca-certificates=2023.2.60_v7.0.306-90.1.el9_2 bundle=/etc/pki/tls/certs/ca-bundle.crt
+
+VERDICT: ROTATE FIRST
+
+php:     NOT AFFECTED BR-2026-0001  /usr/bin/php  [version=8.0.30 sapi=cli package=php-cli 8.0.30-8.el9_8.1 >= distro fix 8.0.30-8.el9_8.1 (RLSA-2026:87151)]
+php:     NOT AFFECTED BR-2026-0001  /usr/bin/php-cgi  [version=8.0.30 sapi=cgi package=php-cli 8.0.30-8.el9_8.1 >= distro fix 8.0.30-8.el9_8.1 (RLSA-2026:87151)]
+php:     NOT AFFECTED BR-2026-0001  /usr/sbin/php-fpm  [version=8.0.30 sapi=fpm package=php-fpm 8.0.30-8.el9_8.1 >= distro fix 8.0.30-8.el9_8.1 (RLSA-2026:87151)]
+os_ca:   AFFECTED BR-2026-0002  /etc/pki/tls/certs/ca-bundle.crt  [contains: emSign ECC Root CA - G3; ca-certificates=2023.2.60_v7.0.306-90.1.el9_2]
+os_ca:   NOTE BR-2026-0003  /etc/pki/tls/certs/ca-bundle.crt  [info only (does not change verdict): present; contains: emSign ECC Root CA - C3;emSign Root CA - C1; ca-certificates=2023.2.60_v7.0.306-90.1.el9_2]
+java:    UNKNOWN (keytool not found)  /etc/pki/ca-trust/extracted/java/cacerts
+go:      NOTE  -  [Go and rustls/webpki-roots apps carry compiled-in roots; they are not scanned. Rebuild them or get an update from the vendor.]
+
+ACTIONS (in order; BlastRadius never runs these for you):
+1. [BR-2026-0002] eMudhra emSign ECC Root CA - G3 removed from Mozilla NSS (compromised intermediates, Oct 2026)
+     sudo dnf upgrade ca-certificates
+     sudo update-ca-trust
+     If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs.
+exit=10
+== pkg rules: Rocky Linux 9.3 (Blue Onyx)
+     php=/usr/bin/php upstream=8.0.30 package=php-cli 8.0.30-8.el9_8.1 (prefix rule: php) os=rocky 9
+PASS PK-1 installed == distro fix -> NOT AFFECTED (upstream rule says affected; distro row wins)
+PASS PK-2 installed < distro fix -> AFFECTED, PATCH FIRST, advisory cited
+PASS PK-3 backport distro, no tracker row for this release -> UNKNOWN needs verification (never guessed)
+PASS PK-4 unpackaged copy (source build) -> upstream compare, not package rule
+== RESULT pkg rocky: 4 passed, 0 failed

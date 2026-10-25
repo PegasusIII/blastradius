@@ -1,0 +1,25 @@
+== real-world smoke: Debian GNU/Linux 12 (bookworm)
+BlastRadius 0.2.0-exp  (read-only; nothing on this host was changed)
+generated: 2026-10-25T21:32:08Z
+definitions: v0.2.0 published 2026-10-26 (bundled), signature OK
+host: os=debian 12 pkg=dpkg ca-certificates=20250419~deb12u2 bundle=/etc/ssl/certs/ca-certificates.crt
+
+VERDICT: OK
+
+php:     NOT AFFECTED BR-2026-0001  /usr/bin/php8.2  [version=8.2.35 sapi=cli package=php8.2-cli 8.2.35-1~deb12u1 >= distro fix 8.2.35-1~deb12u1 (Debian tracker bookworm, DLA-4848-1)]
+php:     NOT AFFECTED BR-2026-0001  /usr/sbin/php-fpm8.2  [version=8.2.35 sapi=fpm package=php8.2-fpm 8.2.35-1~deb12u1 >= distro fix 8.2.35-1~deb12u1 (Debian tracker bookworm, DLA-4848-1)]
+php:     NOT AFFECTED BR-2026-0001  /usr/lib/apache2/modules/libphp8.2.so  [version=8.2.35 sapi=apache2handler package=libapache2-mod-php8.2 8.2.35-1~deb12u1 >= distro fix 8.2.35-1~deb12u1 (Debian tracker bookworm, DLA-4848-1)]
+os_ca:   NOT AFFECTED BR-2026-0002  /etc/ssl/certs/ca-certificates.crt  [ca-certificates=20250419~deb12u2]
+os_ca:   NOTE BR-2026-0003  /etc/ssl/certs/ca-certificates.crt  [info only (does not change verdict): present; contains: emSign ECC Root CA - C3;emSign Root CA - C1; ca-certificates=20250419~deb12u2]
+java:    NOT AFFECTED BR-2026-0002  /etc/ssl/certs/java/cacerts
+java:    NOTE BR-2026-0003  /etc/ssl/certs/java/cacerts  [info only (does not change verdict): present; contains: emSign ECC Root CA - C3;emSign Root CA - C1]
+go:      NOTE  -  [Go and rustls/webpki-roots apps carry compiled-in roots; they are not scanned. Rebuild them or get an update from the vendor.]
+
+exit=0
+== pkg rules: Debian GNU/Linux 12 (bookworm)
+     php=/usr/bin/php8.2 upstream=8.2.35 package=php8.2-cli 8.2.35-1~deb12u1 (prefix rule: php8.2) os=debian 12
+PASS PK-1 installed == distro fix -> NOT AFFECTED (upstream rule says affected; distro row wins)
+PASS PK-2 installed < distro fix -> AFFECTED, PATCH FIRST, advisory cited
+PASS PK-3 non-backport distro, no tracker row -> falls back to upstream compare (AFFECTED vs 999.0.0)
+PASS PK-4 unpackaged copy (source build) -> upstream compare, not package rule
+== RESULT pkg debian: 4 passed, 0 failed

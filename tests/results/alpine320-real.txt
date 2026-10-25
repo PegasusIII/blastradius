@@ -1,0 +1,29 @@
+== real-world smoke: Alpine Linux v3.20
+BlastRadius 0.2.0-exp  (read-only; nothing on this host was changed)
+generated: 2026-10-25T21:33:10Z
+definitions: v0.2.0 published 2026-10-26 (bundled), signature OK
+host: os=alpine 3.20.10 pkg=apk ca-certificates=20261020-r0 bundle=/etc/ssl/certs/ca-certificates.crt
+
+VERDICT: PATCH FIRST
+
+php:     AFFECTED BR-2026-0001  /usr/bin/php83  [version=8.3.15 sapi=cli fixed=8.3.36]
+php:     AFFECTED BR-2026-0001  /usr/sbin/php-fpm83  [version=8.3.15 sapi=fpm fixed=8.3.36]
+os_ca:   NOT AFFECTED BR-2026-0002  /etc/ssl/certs/ca-certificates.crt  [ca-certificates=20261020-r0]
+os_ca:   NOT AFFECTED BR-2026-0003  /etc/ssl/certs/ca-certificates.crt  [ca-certificates=20261020-r0]
+node:    UNKNOWN (node=20.15.1 embedded store: version-match only (no Node rule in definitions))  /usr/bin/node
+go:      NOTE  -  [Go and rustls/webpki-roots apps carry compiled-in roots; they are not scanned. Rebuild them or get an update from the vendor.]
+
+ACTIONS (in order; BlastRadius never runs these for you):
+1. [BR-2026-0001] PHP2Shell: unauthenticated RCE in PHP (CVE-2026-109618, CVE-2026-109619)
+     sudo apk update
+     sudo apk upgrade 'php*'
+     sudo rc-service php-fpm83 restart 2>/dev/null || true
+     Upgrade PHP to >= 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35 (or your distro's patched build), then restart PHP-FPM and Apache. PHP <= 8.1 is EOL: move to a supported branch.
+exit=20
+== pkg rules: Alpine Linux v3.20
+     php=/usr/bin/php83 upstream=8.3.15 package=php83 8.3.15-r0 (prefix rule: php83) os=alpine 3.20
+PASS PK-1 installed == distro fix -> NOT AFFECTED (upstream rule says affected; distro row wins)
+PASS PK-2 installed < distro fix -> AFFECTED, PATCH FIRST, advisory cited
+PASS PK-3 non-backport distro, no tracker row -> falls back to upstream compare (AFFECTED vs 999.0.0)
+PASS PK-4 unpackaged copy (source build) -> upstream compare, not package rule
+== RESULT pkg alpine: 4 passed, 0 failed

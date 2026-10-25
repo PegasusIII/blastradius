@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlastRadius: which hosts are exposed, and what to fix first</title>
+<meta name="description" content="A free, read-only checker for PHP2Shell (CVE-2026-109618/109619) and the eMudhra/emSign root removal. One command, one verdict per host, exact fix commands.">
+<style>
+  :root{--fg:#111;--muted:#555;--bg:#fff;--card:#f5f6f8;--accent:#c0392b;--ok:#1e8449}
+  @media (prefers-color-scheme:dark){:root{--fg:#eee;--muted:#aaa;--bg:#111;--card:#1c1d21}}
+  *{box-sizing:border-box}body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg)}
+  main{max-width:860px;margin:0 auto;padding:2.5rem 1.25rem}
+  h1{font-size:2.1rem;line-height:1.2;margin:.2rem 0 1rem}h2{margin-top:2.5rem}
+  .tag{display:inline-block;font-size:.8rem;background:var(--accent);color:#fff;padding:.15rem .5rem;border-radius:4px}
+  pre{background:var(--card);padding:1rem;border-radius:8px;overflow:auto;font-size:.85rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}
+  .card{background:var(--card);border-radius:10px;padding:1.1rem}
+  .plans label{display:block;background:var(--card);border:2px solid transparent;border-radius:10px;padding:1rem;margin:.6rem 0;cursor:pointer}
+  .plans input[type=radio]:checked+span{font-weight:700}
+  input[type=email]{width:100%;padding:.7rem;font-size:1rem;border-radius:6px;border:1px solid #888}
+  button{margin-top:1rem;padding:.75rem 1.4rem;font-size:1rem;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
+  .muted{color:var(--muted);font-size:.9rem}#msg{margin-top:.8rem;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <span class="tag">Experiment build</span>
+  <h1>PHP2Shell and the eMudhra root removal: which of your hosts are exposed, and what do you fix first?</h1>
+  <p>BlastRadius is a free, read-only shell script. Run it as a normal user and you get <b>one verdict per host</b> (<code>PATCH FIRST</code>, <code>ROTATE FIRST</code> or <code>OK</code>) plus the exact commands for your distro. It never changes anything on the host and it doesn't phone home.</p>
+
+<pre>curl -fsSLO https://github.com/OWNER/blastradius/releases/latest/download/blastradius.tar.gz   # placeholder, not live
+tar xzf blastradius.tar.gz && sh blastradius/bin/blastradius
+
+VERDICT: PATCH FIRST
+php:     AFFECTED BR-2026-0001  /usr/sbin/php-fpm8.3  [version=8.3.6 sapi=fpm fixed=8.3.36]
+os_ca:   AFFECTED BR-2026-0002  /etc/pki/tls/certs/ca-bundle.crt  [contains: emSign ECC Root CA - G3]
+certifi: AFFECTED BR-2026-0002  /srv/app/venv/.../certifi/cacert.pem
+ACTIONS (in order; BlastRadius never runs these for you):
+1. [BR-2026-0001] PHP2Shell ... sudo apt-get install --only-upgrade 'php*'
+2. [BR-2026-0002] eMudhra ... sudo apt-get install --only-upgrade ca-certificates</pre>
+
+  <h2>What it checks that outside-in monitors can't see</h2>
+  <div class="grid">
+    <div class="card"><b>Every PHP build</b><br>CLI, FPM, CGI and mod_php, with version and SAPI, against the fixed versions 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35.</div>
+    <div class="card"><b>Trust stores</b><br>The OS bundle, Python certifi and Java cacerts, checked for distrusted roots by fingerprint. The Node version is reported, and you get a note for Go/rustls.</div>
+    <div class="card"><b>Certs you didn't issue</b><br>Leaf certs referenced by nginx, Apache, HAProxy and Postfix that chain to a distrusted CA.</div>
+    <div class="card"><b>Safe to run</b><br>Read-only, no root, no network, signed definitions, MIT licensed. Fix commands are printed, never run.</div>
+  </div>
+
+  <h2>Get told when the next one hits</h2>
+  <p>Incidents like this land a few times a year. Pick what you'd want:</p>
+  <p class="muted">Options: <b>Free incident emails</b> (a short email when a new high-blast-radius incident is added, with the command to run) or <b>$9/mo continuous monitoring</b> (notify me at launch; nothing is charged now).</p>
+  <!-- ===== TALLY EMBED PLACEHOLDER =====
+       Replace TALLY_FORM_ID (one place: the data-form-id attribute below) with the real Tally form ID,
+       e.g. data-form-id="wA1bC2". Until then the page shows a "coming soon" note and loads nothing from Tally. -->
+  <div id="tally-waitlist" data-form-id="TALLY_FORM_ID">
+    <iframe id="tally-frame" title="BlastRadius waitlist" width="100%" height="320" frameborder="0" marginheight="0" marginwidth="0" loading="lazy" hidden></iframe>
+    <p id="tally-pending" class="muted">The waitlist form is coming soon.</p>
+  </div>
+  <!-- ===== END TALLY EMBED PLACEHOLDER ===== -->
+  <p class="muted">Privacy: signups are stored by Tally, outside Australia. We only use your email for this waitlist, and no card is taken.</p>
+
+  <h2>Sources</h2>
+  <ul class="muted">
+    <li>PHP: <a href="https://www.php.net/archive/2026.php">php.net news (21 Oct 2026)</a>, <a href="https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp">GHSA-6wmf-4rv5-p3rp</a>, <a href="https://cert.europa.eu/publications/security-advisories/2026-018">CERT-EU 2026-018</a></li>
+    <li>eMudhra: <a href="https://blog.mozilla.org/security/2026/10/20/protecting-firefox-users-following-the-compromise-of-emudhra-intermediate-certificates/">Mozilla Security Blog</a>, <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=2083709">Mozilla bug 2083709</a></li>
+  </ul>
+  <p class="muted">Distro backports: on Ubuntu, Debian, RHEL/Rocky and Alpine, BlastRadius compares your installed PHP package against the fixed version from that distro's security tracker. Where we have no tracker entry on a distro that backports, it says UNKNOWN (needs verification) instead of guessing.</p>
+</main>
+<script>
+(function(){var w=document.getElementById('tally-waitlist'),id=w.getAttribute('data-form-id');
+if(!id||id==='TALLY_FORM_ID')return; /* placeholder: no request to Tally */
+var f=document.getElementById('tally-frame');f.setAttribute('data-tally-src','https://tally.so/embed/'+encodeURIComponent(id)+'?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1');f.hidden=false;document.getElementById('tally-pending').hidden=true;
+var s=document.createElement('script');s.src='https://tally.so/widgets/embed.js';s.onload=function(){if(window.Tally)Tally.loadEmbeds();else f.src=f.getAttribute('data-tally-src');};s.onerror=function(){f.src=f.getAttribute('data-tally-src');};document.body.appendChild(s);})();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "blastradius/report.schema.json",
+  "title": "BlastRadius report (experiment build)",
+  "type": "object",
+  "required": ["tool", "checker_version", "generated_at", "definitions", "host", "verdict", "exit_code", "checks", "actions"],
+  "properties": {
+    "tool": {"const": "blastradius"},
+    "checker_version": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "definitions": {"type": "object", "required": ["version", "published_at", "source", "signature_verified"]},
+    "host": {"type": "object", "required": ["os_id", "package_manager"]},
+    "verdict": {"enum": ["OK", "ROTATE FIRST", "PATCH FIRST", "UNKNOWN"]},
+    "exit_code": {"enum": [0, 10, 20, 30]},
+    "checks": {"type": "array", "items": {"type": "object", "required": ["section", "incident", "status", "subject", "detail"],
+      "properties": {"status": {"enum": ["AFFECTED", "NOT_AFFECTED", "UNKNOWN", "INFO"]}}}},
+    "actions": {"type": "array", "items": {"type": "object", "required": ["rank", "incident", "title", "commands"]}}
+  }
+}

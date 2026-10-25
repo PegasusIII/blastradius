@@ -1,0 +1,104 @@
+META	version	0.2.0
+META	published_at	2026-10-26
+INC	BR-2026-0001	runtime_cve	1	2026-10-21	PHP2Shell: unauthenticated RCE in PHP (CVE-2026-109618, CVE-2026-109619)
+REF	BR-2026-0001	https://www.php.net/archive/2026.php
+REF	BR-2026-0001	https://news-web.php.net/php.announce/512
+REF	BR-2026-0001	https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp
+REF	BR-2026-0001	https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/
+REF	BR-2026-0001	https://cert.europa.eu/publications/security-advisories/2026-018
+REF	BR-2026-0001	https://ubuntu.com/security/CVE-2026-109618
+REF	BR-2026-0001	https://ubuntu.com/security/CVE-2026-109619
+REF	BR-2026-0001	https://security-tracker.debian.org/tracker/CVE-2026-109618
+REF	BR-2026-0001	https://security-tracker.debian.org/tracker/CVE-2026-109619
+REF	BR-2026-0001	https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109618.json
+REF	BR-2026-0001	https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-109619.json
+REF	BR-2026-0001	https://errata.rockylinux.org/api/v2/advisories?filters.cve=CVE-2026-109618
+REF	BR-2026-0001	https://secdb.alpinelinux.org/
+VB	BR-2026-0001	php	8.5	8.5.12
+VB	BR-2026-0001	php	8.4	8.4.27
+VB	BR-2026-0001	php	8.3	8.3.36
+VB	BR-2026-0001	php	8.2	8.2.35
+EOL	BR-2026-0001	php	8.1
+PKGFIX	BR-2026-0001	ubuntu	24.04	php8.3	8.3	8.3.6-0ubuntu0.24.04.13	Ubuntu CVE tracker (noble php8.3)
+PKGFIX	BR-2026-0001	ubuntu	22.04	php8.1	8.1	8.1.2-1ubuntu2.28	Ubuntu CVE tracker (jammy php8.1)
+PKGFIX	BR-2026-0001	ubuntu	26.04	php8.5	8.5	8.5.4-0ubuntu1.5	Ubuntu CVE tracker (resolute php8.5)
+PKGFIX	BR-2026-0001	ubuntu	20.04	php7.4	7.4	7.4.3-4ubuntu2.29+esm5	Ubuntu CVE tracker (focal php7.4, Ubuntu Pro/ESM only)
+PKGFIX	BR-2026-0001	debian	12	php8.2	8.2	8.2.35-1~deb12u1	Debian tracker bookworm, DLA-4848-1
+PKGFIX	BR-2026-0001	debian	13	php8.4	8.4	8.4.27-1~deb13u1	Debian tracker trixie, DSA-6574-1
+PKGFIX	BR-2026-0001	rhel	9	php	8.0	8.0.30-8.el9_8.1	RHSA-2026:87151
+PKGFIX	BR-2026-0001	rhel	10	php	8.3	8.3.36-1.el10_2	RHSA-2026:87070
+PKGFIX	BR-2026-0001	rhel	10	php8.4	8.4	8.4.27-1.el10_2	RHSA-2026:87071
+PKGFIX	BR-2026-0001	rocky	9	php	8.0	8.0.30-8.el9_8.1	RLSA-2026:87151
+PKGFIX	BR-2026-0001	rocky	9	php	8.2	8.2.35-1.module+el9.8.0+40395+2f706e64	RLSA-2026:87072 (php:8.2 module)
+PKGFIX	BR-2026-0001	rocky	9	php	8.3	8.3.36-1.module+el9.8.0+40396+4e680bb7	RLSA-2026:87079 (php:8.3 module)
+PKGFIX	BR-2026-0001	rocky	10	php	8.3	8.3.36-1.el10_2	RLSA-2026:87070
+PKGFIX	BR-2026-0001	rocky	8	php	8.2	8.2.35-1.module+el8.10.0+40394+d21b33fb	RLSA-2026:87073 (php:8.2 module)
+PKGFIX	BR-2026-0001	rocky	8	php	7.4	7.4.33-8.module+el8.10.0+40393+c071e357	RLSA-2026:87080 (php:7.4 module)
+PKGFIX	BR-2026-0001	alpine	3.21	php82	8.2	8.2.35-r0	Alpine secdb v3.21
+PKGFIX	BR-2026-0001	alpine	3.22	php82	8.2	8.2.35-r0	Alpine secdb v3.22
+PKGFIX	BR-2026-0001	alpine	3.22	php83	8.3	8.3.36-r0	Alpine secdb v3.22
+PKGFIX	BR-2026-0001	alpine	3.22	php84	8.4	8.4.27-r0	Alpine secdb v3.22
+REM	BR-2026-0001	dpkg	sudo apt-get update
+REM	BR-2026-0001	dpkg	sudo apt-get install --only-upgrade 'php*'
+REM	BR-2026-0001	dpkg	sudo systemctl restart 'php*-fpm' apache2 2>/dev/null || true
+REM	BR-2026-0001	rpm	sudo dnf upgrade 'php*'
+REM	BR-2026-0001	rpm	sudo systemctl restart php-fpm httpd 2>/dev/null || true
+REM	BR-2026-0001	apk	sudo apk update
+REM	BR-2026-0001	apk	sudo apk upgrade 'php*'
+REM	BR-2026-0001	apk	sudo rc-service php-fpm83 restart 2>/dev/null || true
+REM	BR-2026-0001	any	Upgrade PHP to >= 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35 (or your distro's patched build), then restart PHP-FPM and Apache. PHP <= 8.1 is EOL: move to a supported branch.
+INC	BR-2026-0002	ca_distrust	1	2026-10-21	eMudhra emSign ECC Root CA - G3 removed from Mozilla NSS (compromised intermediates, Oct 2026)
+REF	BR-2026-0002	https://blog.mozilla.org/security/2026/10/20/protecting-firefox-users-following-the-compromise-of-emudhra-intermediate-certificates/
+REF	BR-2026-0002	https://bugzilla.mozilla.org/show_bug.cgi?id=2083449
+REF	BR-2026-0002	https://bugzilla.mozilla.org/show_bug.cgi?id=2083709
+REF	BR-2026-0002	https://archlinux.org/news/update-to-ca-certificates-mozilla-31311-1-to-prevent-man-in-the-middle-attacks/
+REF	BR-2026-0002	https://emudhra.com/en/post/certificate-security-incident
+REF	BR-2026-0002	https://bugzilla.mozilla.org/show_bug.cgi?id=2084101
+REF	BR-2026-0002	https://ccadb.my.salesforce-sites.com/mozilla/RemovedCACertificateReportCSVFormat
+FP	BR-2026-0002	86A1ECBA089C4A8D3BBE2734C612BA341D813E043CF9E8A862CD5C57A36BBE6B	os_ca,certifi,java,leaf_chain	emSign ECC Root CA - G3
+FP	BR-2026-0002	E7568FE6E12331F4FD7DE61DA4C7559D0F8EB192A218D4741A3BA75184333838	leaf_chain	EM EV TLS CA - G3B
+FP	BR-2026-0002	98B896625C0C230ADEEC3EB2CF6AAD5001ECF9156A68644E82374CE5833BC25B	leaf_chain	EM OV TLS CA - G3B
+FP	BR-2026-0002	42C4ACCD12C4F59597925E1A08A7A90102608543809308D50EC427E118BA1493	leaf_chain	EM DV TLS CA - G3B
+FP	BR-2026-0002	432EC25F0D28DE9006D97BF752F17BBB2CD41F669933FCB072D9A1148D0261F3	leaf_chain	EM EV TLS CA - G3C
+FP	BR-2026-0002	CB6E15165AC802E9B3F993F16C25D41F4E81C21EBDE71AE1B012AC00BF9C7C3F	leaf_chain	EM OV TLS CA - G3C
+FP	BR-2026-0002	0164D7CEAE5BB909C272AF151FF44B1177AE9B47D9424B94F1D9558C30934D19	leaf_chain	EM DV TLS CA - G3C
+ICN	BR-2026-0002	emSign ECC Root CA - G3
+ICN	BR-2026-0002	emSign Root TLS CA - G3
+ICN	BR-2026-0002	EM EV TLS CA - G3B
+ICN	BR-2026-0002	EM OV TLS CA - G3B
+ICN	BR-2026-0002	EM DV TLS CA - G3B
+ICN	BR-2026-0002	EM EV TLS CA - G3C
+ICN	BR-2026-0002	EM OV TLS CA - G3C
+ICN	BR-2026-0002	EM DV TLS CA - G3C
+REM	BR-2026-0002	dpkg	sudo apt-get update
+REM	BR-2026-0002	dpkg	sudo apt-get install --only-upgrade ca-certificates
+REM	BR-2026-0002	dpkg	sudo update-ca-certificates --fresh
+REM	BR-2026-0002	rpm	sudo dnf upgrade ca-certificates
+REM	BR-2026-0002	rpm	sudo update-ca-trust
+REM	BR-2026-0002	apk	sudo apk update
+REM	BR-2026-0002	apk	sudo apk upgrade ca-certificates
+REM	BR-2026-0002	apk	sudo update-ca-certificates
+REM	BR-2026-0002	certifi	<venv>/bin/pip install --upgrade certifi   # run for each listed virtualenv/site-packages
+REM	BR-2026-0002	java	Upgrade the JDK/JRE package (or remove the alias with: keytool -delete -alias <alias> -keystore <cacerts>)
+REM	BR-2026-0002	leaf	Reissue the listed certificate from a CA that does not chain to eMudhra/emSign, deploy it, reload the service
+REM	BR-2026-0002	any	If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs.
+INC	BR-2026-0003	ca_info	9	2026-10-21	emSign Root CA - C1 / emSign ECC Root CA - C3 planned removal from Mozilla NSS (info only; not the compromise)
+REF	BR-2026-0003	https://bugzilla.mozilla.org/show_bug.cgi?id=2083709
+REF	BR-2026-0003	https://emudhra.com/en/post/certificate-security-incident
+REF	BR-2026-0003	https://ccadb.my.salesforce-sites.com/mozilla/RemovedCACertificateReportCSVFormat
+FP	BR-2026-0003	125609AA301DA0A249B97A8239CB6A34216F44DCAC9F3954B14292F2E8C8608F	os_ca,certifi,java,leaf_chain	emSign Root CA - C1
+FP	BR-2026-0003	BC4D809B15189D78DB3E1D8CF4F9726A795DA1643CA5F1358E1DDB0EDC0D7EB3	os_ca,certifi,java,leaf_chain	emSign ECC Root CA - C3
+ICN	BR-2026-0003	emSign Root CA - C1
+ICN	BR-2026-0003	emSign ECC Root CA - C3
+REM	BR-2026-0003	dpkg	sudo apt-get update
+REM	BR-2026-0003	dpkg	sudo apt-get install --only-upgrade ca-certificates
+REM	BR-2026-0003	dpkg	sudo update-ca-certificates --fresh
+REM	BR-2026-0003	rpm	sudo dnf upgrade ca-certificates
+REM	BR-2026-0003	rpm	sudo update-ca-trust
+REM	BR-2026-0003	apk	sudo apk update
+REM	BR-2026-0003	apk	sudo apk upgrade ca-certificates
+REM	BR-2026-0003	apk	sudo update-ca-certificates
+REM	BR-2026-0003	certifi	<venv>/bin/pip install --upgrade certifi   # run for each listed virtualenv/site-packages
+REM	BR-2026-0003	java	Upgrade the JDK/JRE package (or remove the alias with: keytool -delete -alias <alias> -keystore <cacerts>)
+REM	BR-2026-0003	leaf	Reissue the listed certificate from a CA that does not chain to eMudhra/emSign, deploy it, reload the service
+REM	BR-2026-0003	any	If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs.

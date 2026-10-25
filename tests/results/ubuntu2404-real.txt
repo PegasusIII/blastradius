@@ -1,0 +1,33 @@
+== real-world smoke: Ubuntu 24.04.5 LTS
+BlastRadius 0.2.0-exp  (read-only; nothing on this host was changed)
+generated: 2026-10-25T21:32:31Z
+definitions: v0.2.0 published 2026-10-26 (bundled), signature OK
+host: os=ubuntu 24.04 pkg=dpkg ca-certificates=20260816ubuntu0.24.04.1 bundle=/etc/ssl/certs/ca-certificates.crt
+
+VERDICT: ROTATE FIRST
+
+php:     NOT AFFECTED BR-2026-0001  /usr/bin/php8.3  [version=8.3.6 sapi=cli package=php8.3-cli 8.3.6-0ubuntu0.24.04.13 >= distro fix 8.3.6-0ubuntu0.24.04.13 (Ubuntu CVE tracker (noble php8.3))]
+php:     NOT AFFECTED BR-2026-0001  /usr/sbin/php-fpm8.3  [version=8.3.6 sapi=fpm package=php8.3-fpm 8.3.6-0ubuntu0.24.04.13 >= distro fix 8.3.6-0ubuntu0.24.04.13 (Ubuntu CVE tracker (noble php8.3))]
+os_ca:   NOT AFFECTED BR-2026-0002  /etc/ssl/certs/ca-certificates.crt  [ca-certificates=20260816ubuntu0.24.04.1]
+os_ca:   NOTE BR-2026-0003  /etc/ssl/certs/ca-certificates.crt  [info only (does not change verdict): present; contains: emSign ECC Root CA - C3;emSign Root CA - C1; ca-certificates=20260816ubuntu0.24.04.1]
+certifi: AFFECTED BR-2026-0002  /usr/lib/python3/dist-packages/certifi/cacert.pem  [contains: emSign ECC Root CA - G3]
+certifi: NOTE BR-2026-0003  /usr/lib/python3/dist-packages/certifi/cacert.pem  [info only (does not change verdict): present; contains: emSign Root CA - C1;emSign ECC Root CA - C3]
+node:    UNKNOWN (node=18.19.1 embedded store: version-match only (no Node rule in definitions))  /usr/bin/node
+go:      NOTE  -  [Go and rustls/webpki-roots apps carry compiled-in roots; they are not scanned. Rebuild them or get an update from the vendor.]
+
+ACTIONS (in order; BlastRadius never runs these for you):
+1. [BR-2026-0002] eMudhra emSign ECC Root CA - G3 removed from Mozilla NSS (compromised intermediates, Oct 2026)
+     sudo apt-get update
+     sudo apt-get install --only-upgrade ca-certificates
+     sudo update-ca-certificates --fresh
+     If your distro has no update yet, remove the listed roots from your local trust store per your distro's docs.
+     <venv>/bin/pip install --upgrade certifi   # run for each listed virtualenv/site-packages
+       -> /usr/lib/python3/dist-packages/certifi/cacert.pem
+exit=10
+== pkg rules: Ubuntu 24.04.5 LTS
+     php=/usr/bin/php8.3 upstream=8.3.6 package=php8.3-cli 8.3.6-0ubuntu0.24.04.13 (prefix rule: php8.3) os=ubuntu 24.04
+PASS PK-1 installed == distro fix -> NOT AFFECTED (upstream rule says affected; distro row wins)
+PASS PK-2 installed < distro fix -> AFFECTED, PATCH FIRST, advisory cited
+PASS PK-3 backport distro, no tracker row for this release -> UNKNOWN needs verification (never guessed)
+PASS PK-4 unpackaged copy (source build) -> upstream compare, not package rule
+== RESULT pkg ubuntu: 4 passed, 0 failed

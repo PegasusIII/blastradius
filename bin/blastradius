@@ -1,0 +1,477 @@
+#!/bin/sh
+# BlastRadius - read-only incident exposure checker (experiment build)
+# SPDX-License-Identifier: MIT
+# Never modifies the host: it only reads files, runs a fixed allowlist of
+# read-only commands, writes scratch data under $TMPDIR, and PRINTS fixes.
+set -u
+BR_VERSION="0.2.0-exp"
+LC_ALL=C; export LC_ALL
+umask 077
+
+# Embedded definitions signing key (Ed25519). Replace before release.
+BR_PUBKEY='-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAsIUkIukjEG6Ki9J021BWJ0KzwPq9Vz9DRIKqgabmbPY=
+-----END PUBLIC KEY-----'
+
+usage() {
+  cat <<'U'
+Usage: blastradius [options]
+  --json                 print one JSON document instead of text
+  --definitions PATH|URL use a newer signed definitions file (.tsv + .tsv.sig)
+  --trust-key FILE       verify definitions with this public key (testing/private defs)
+  --scan-roots "D1 D2"   roots searched for certifi bundles (default: /usr /opt /srv /home /var/www)
+  --include-hostname     include hostname in JSON output
+  --no-color             no ANSI colour (default when stdout is not a TTY)
+  --version | -h
+Exit codes: 0 OK, 10 ROTATE FIRST, 20 PATCH FIRST, 30 UNKNOWN, 2 usage/definitions error
+U
+}
+
+JSON=0; DEFS=""; TRUSTKEY=""; INC_HOST=0; COLOR=0
+SCAN_ROOTS="/usr /opt /srv /home /var/www"
+[ -t 1 ] && COLOR=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json) JSON=1 ;;
+    --definitions) [ $# -ge 2 ] || { usage >&2; exit 2; }; DEFS=$2; shift ;;
+    --trust-key) [ $# -ge 2 ] || { usage >&2; exit 2; }; TRUSTKEY=$2; shift ;;
+    --scan-roots) [ $# -ge 2 ] || { usage >&2; exit 2; }; SCAN_ROOTS=$2; shift ;;
+    --include-hostname) INC_HOST=1 ;;
+    --no-color) COLOR=0 ;;
+    --report|--token|--include-sans) echo "blastradius: $1 is not available in the experiment build" >&2; exit 2 ;;
+    --version) echo "blastradius $BR_VERSION"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "blastradius: unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+[ "$JSON" = 1 ] && COLOR=0
+
+W=$(mktemp -d "${TMPDIR:-/tmp}/blastradius.XXXXXX") || { echo "blastradius: cannot create temp dir" >&2; exit 2; }
+trap 'rm -rf "$W"' EXIT INT TERM
+TAB=$(printf '\t')
+have() { command -v "$1" >/dev/null 2>&1; }
+HAVE_OPENSSL=0; have openssl && HAVE_OPENSSL=1
+die2() { echo "blastradius: $*" >&2; exit 2; }
+
+# ---------------------------------------------------------------- definitions
+SELF_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+SIGNED=1
+if [ -z "$DEFS" ]; then
+  for c in "$SELF_DIR/../definitions/incidents.tsv" "$SELF_DIR/incidents.tsv" /usr/share/blastradius/incidents.tsv; do
+    [ -f "$c" ] && { DEFS=$c; break; }
+  done
+  [ -n "$DEFS" ] || die2 "bundled definitions not found"
+  DEFSRC="bundled"
+else
+  DEFSRC="$DEFS"
+fi
+case "$DEFS" in
+  http://*) die2 "definitions URL must be https" ;;
+  https://*)
+    if have curl; then
+      if ! { curl -fsS --proto '=https' -o "$W/defs.tsv" "$DEFS" && curl -fsS --proto '=https' -o "$W/defs.tsv.sig" "$DEFS.sig"; }; then die2 "cannot download definitions"; fi
+    elif have wget; then
+      if ! { wget -q -O "$W/defs.tsv" "$DEFS" && wget -q -O "$W/defs.tsv.sig" "$DEFS.sig"; }; then die2 "cannot download definitions"; fi
+    else die2 "need curl or wget to fetch definitions URL"; fi ;;
+  *) [ -r "$DEFS" ] || die2 "cannot read definitions: $DEFS"
+     cp "$DEFS" "$W/defs.tsv"; [ -r "$DEFS.sig" ] && cp "$DEFS.sig" "$W/defs.tsv.sig" ;;
+esac
+if [ -n "$TRUSTKEY" ]; then cp "$TRUSTKEY" "$W/pub.pem" || die2 "cannot read trust key"; else printf '%s\n' "$BR_PUBKEY" > "$W/pub.pem"; fi
+if [ ! -f "$W/defs.tsv.sig" ]; then
+  die2 "definitions signature missing ($DEFS.sig)"
+elif [ "$HAVE_OPENSSL" = 1 ]; then
+  openssl pkeyutl -verify -pubin -inkey "$W/pub.pem" -rawin -in "$W/defs.tsv" -sigfile "$W/defs.tsv.sig" >/dev/null 2>&1 \
+    || die2 "definitions signature invalid"
+else
+  [ "$DEFSRC" = bundled ] || die2 "cannot verify definitions signature (openssl not found)"
+  SIGNED=0
+fi
+D="$W/defs.tsv"
+# structural validation: report first invalid line
+awk -F'\t' '
+  function bad(m){ printf "definitions invalid at line %d (%s): %s\n", NR, $1, m; exit 1 }
+  $1=="META"   { if (NF!=3) bad("META needs 3 fields"); if ($2=="version" && $3 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) bad("version must be semver"); next }
+  $1=="INC"    { if (NF!=6) bad("INC needs 6 fields"); if ($3!="runtime_cve" && $3!="ca_distrust" && $3!="ca_info") bad("kind"); if ($4 !~ /^[0-9]+$/) bad("severity_rank"); next }
+  $1=="VB"     { if (NF!=5 || $4 !~ /^[0-9]+\.[0-9]+$/ || $5 !~ /^[0-9]+(\.[0-9]+)*$/) bad("VB.branch/fixed_version"); next }
+  $1=="EOL"    { if (NF!=4 || $4 !~ /^[0-9]+\.[0-9]+$/) bad("EOL.branch_max"); next }
+  $1=="FP"     { if (NF!=5 || length($3)!=64 || $3 !~ /^[0-9A-F]+$/) bad("FP.sha256"); next }
+  $1=="ICN" || $1=="REF" { if (NF!=3) bad($1 " needs 3 fields"); next }
+  $1=="PKGMIN" { if (NF!=5) bad("PKGMIN needs 5 fields"); next }
+  $1=="PKGFIX" { if (NF!=8 || $6 !~ /^[0-9]+\.[0-9]+$/ || $7=="" || $8=="") bad("PKGFIX needs 8 fields: inc os_id os_rel package branch fixed advisory"); next }
+  $1=="NODE"   { if (NF!=4) bad("NODE needs 4 fields"); next }
+  $1=="REM"    { if (NF!=4) bad("REM needs 4 fields"); next }
+  { bad("unknown record type") }
+  END { }' "$D" > "$W/val" || die2 "$(cat "$W/val")"
+DEF_VER=$(awk -F'\t' '$1=="META"&&$2=="version"{print $3}' "$D")
+DEF_PUB=$(awk -F'\t' '$1=="META"&&$2=="published_at"{print $3}' "$D")
+[ -n "$DEF_VER" ] || die2 "definitions invalid: META.version missing"
+
+# ---------------------------------------------------------------- helpers
+# results: section TAB incident TAB status TAB subject TAB detail
+R="$W/results"; : > "$R"
+# ca_info incidents (e.g. planned root retirements) are informational only:
+# any result for them is recorded as INFO so it can never change the verdict.
+INFO_INCS=" $(awk -F'\t' '$1=="INC"&&$3=="ca_info"{printf "%s ", $2}' "$D")"
+res() {
+  _st=$3; _dt=$5
+  case "$INFO_INCS" in *" $2 "*) case "$_st" in AFFECTED) _st=INFO; _dt="info only (does not change verdict): present; $_dt" ;; UNKNOWN) _st=INFO; _dt="info only: could not check; $_dt" ;; esac ;; esac
+  printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$_st" "$4" "$_dt" >> "$R"; }
+ver_lt() { awk -v a="$1" -v b="$2" 'BEGIN{n=split(a,x,".");m=split(b,y,".");k=(n>m)?n:m;for(i=1;i<=k;i++){p=x[i]+0;q=y[i]+0;if(p<q)exit 0;if(p>q)exit 1}exit 1}'; }
+norm_fp() { sed -n 's/^.*[Ff]ingerprint=//p' | tr -d ':' | tr 'a-f' 'A-F'; }
+fp_list() { awk -F'\t' -v s="$1" '$1=="FP"{n=split($4,a,",");for(i=1;i<=n;i++)if(a[i]==s)print $3"\t"$2"\t"$5}' "$D"; }
+# split PEM bundle into $2/NNNN.pem (only CERTIFICATE blocks)
+split_pem() { mkdir -p "$2"; awk -v d="$2" '/-----BEGIN CERTIFICATE-----/{n++;f=sprintf("%s/%04d.pem",d,n);w=1} w{print > f} /-----END CERTIFICATE-----/{if(w)close(f);w=0}' "$1"; }
+# bundle_fps FILE -> prints "FP<TAB>CN" for candidate certs, cached by content hash.
+# Speed: one openssl pipeline lists every subject; only certs whose subject CN
+# equals a definitions FP label (which must be the cert's exact subject CN) are
+# fingerprinted. The fingerprint is still the deciding match. All CNs -> $c.cns
+bundle_fps() {
+  h=$(sha256sum "$1" 2>/dev/null | cut -c1-64) || return 1
+  c="$W/cache.$h"
+  if [ ! -f "$c" ]; then
+    openssl crl2pkcs7 -nocrl -certfile "$1" 2>/dev/null | openssl pkcs7 -print_certs -noout 2>/dev/null \
+      | sed -n 's/^subject=//p' | sed 's/.*CN *= *//; s/, *[A-Za-z]* *=.*//; s/\/.*//' > "$c.cns"
+    awk -F'\t' '$1=="FP"{print $5}' "$D" | sort -u > "$W/wantcn"
+    if awk 'NR==FNR{w[$0]=1;next} ($0 in w){print FNR}' "$W/wantcn" "$c.cns" > "$W/idx" && [ -s "$W/idx" ]; then
+      rm -rf "$W/split"; split_pem "$1" "$W/split"
+      while read -r n; do
+        p=$(printf '%s/%04d.pem' "$W/split" "$n")
+        fp=$(openssl x509 -in "$p" -noout -fingerprint -sha256 2>/dev/null | norm_fp)
+        [ -n "$fp" ] && printf '%s\t%s\n' "$fp" "$(sed -n "${n}p" "$c.cns")"
+      done < "$W/idx" > "$c"
+    else : > "$c"; fi
+  fi
+  cat "$c"
+}
+match_fps() { # $1 = fps file (FP\tsubj) ; $2 store type ; prints incident\tlabel
+  fp_list "$2" > "$W/want"
+  awk -F'\t' 'NR==FNR{w[$1]=$2"\t"$3;next} ($1 in w){print w[$1]}' "$W/want" "$1"
+}
+
+# ---------------------------------------------------------------- host facts
+OS_ID=unknown; OS_VER=""
+if [ -r /etc/os-release ]; then
+  OS_ID=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"'); OS_VER=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+fi
+# release key used by distro rules: ubuntu=VERSION_ID, alpine=major.minor, others=major
+case "$OS_ID" in ubuntu) OS_REL=$OS_VER ;; alpine) OS_REL=$(echo "$OS_VER" | cut -d. -f1-2) ;; *) OS_REL=$(echo "$OS_VER" | cut -d. -f1) ;; esac
+# distros known to backport security fixes without changing the upstream version
+case "$OS_ID" in ubuntu|rhel|rocky|almalinux|centos|ol) BACKPORT=1 ;; *) BACKPORT=0 ;; esac
+PM=unknown
+if have dpkg-query; then PM=dpkg; elif have rpm; then PM=rpm; elif have apk; then PM=apk; fi
+HOSTNAME_V=""; [ "$INC_HOST" = 1 ] && HOSTNAME_V=$(uname -n)
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# ---------------------------------------------------------------- PHP (US-2)
+# rpm-style version compare (segments of digits/letters; tilde sorts first). exit 0 if $1 < $2
+rpmver_lt() { awk -v a="$1" -v b="$2" '
+  function seg(s,  m){ if (s ~ /^~/) return "~"; if (match(s,/^[0-9]+/)) return substr(s,1,RLENGTH); if (match(s,/^[A-Za-z]+/)) return substr(s,1,RLENGTH); return "" }
+  BEGIN{ while (1) {
+      sub(/^[^A-Za-z0-9~]+/,"",a); sub(/^[^A-Za-z0-9~]+/,"",b)
+      if (a=="" || b=="") break
+      x=seg(a); y=seg(b)
+      if (x=="~" || y=="~") { if (x!=y) exit (x=="~")?0:1; a=substr(a,2); b=substr(b,2); continue }
+      a=substr(a,length(x)+1); b=substr(b,length(y)+1)
+      nx=(x ~ /^[0-9]/); ny=(y ~ /^[0-9]/)
+      if (nx!=ny) exit (nx)?1:0
+      if (nx) { sub(/^0+/,"",x); sub(/^0+/,"",y); if (length(x)!=length(y)) exit (length(x)<length(y))?0:1 }
+      if (x<y) exit 0; if (x>y) exit 1 }
+    exit (a=="" && b!="")?0:1 }'; }
+pkgver_lt() { # pm installed fixed
+  case "$1" in
+    dpkg) dpkg --compare-versions "$2" lt "$3" ;;
+    apk) [ "$(apk version -t "$2" "$3" 2>/dev/null)" = "<" ] ;;
+    rpm) e1=0; e2=0; v1=$2; v2=$3
+         case "$v1" in *:*) e1=${v1%%:*}; v1=${v1#*:} ;; esac; case "$v2" in *:*) e2=${v2%%:*}; v2=${v2#*:} ;; esac
+         if [ "$e1" != "$e2" ]; then [ "$e1" -lt "$e2" ]; else rpmver_lt "$v1" "$v2"; fi ;;
+    *) return 2 ;;
+  esac; }
+# pkg_owner PATH -> "name<TAB>full-version<TAB>source-package" of the owning distro package (read-only DB query)
+pkg_owner() {
+  case "$PM" in
+    dpkg) n=$(dpkg-query -S "$1" 2>/dev/null | head -n1 | cut -d: -f1); n=${n%% *}
+          [ -n "$n" ] && dpkg-query -W -f='${Package}\t${Version}\t${source:Package}\n' "$n" 2>/dev/null | head -n1 ;;
+    rpm) rpm -qf --qf '%{NAME}\t%{EPOCH}:%{VERSION}-%{RELEASE}\t%{SOURCERPM}\n' "$1" 2>/dev/null | head -n1 | grep -v 'not owned' | sed 's/\t(none):/\t/; s/-[^-]*-[^-]*\.src\.rpm$//' ;;
+    apk) apk info --who-owns "$1" 2>/dev/null | sed -n 's/.* is owned by \(.*\)-\([0-9][^-]*-r[0-9]*\)$/\1\t\2\t\1/p' | head -n1 ;;
+  esac; }
+php_branch_eval() { # path sapi version
+  pth=$1; sapi=$2; v=$3
+  br=$(echo "$v" | cut -d. -f1-2)
+  own=$(pkg_owner "$pth"); opkg=$(echo "$own" | cut -f1); over=$(echo "$own" | cut -f2); osrc=$(echo "$own" | cut -f3)
+  [ -n "$over" ] || opkg=""
+  awk -F'\t' '$1=="INC"&&$3=="runtime_cve"{print $2}' "$D" | while read -r inc; do
+    if [ -n "$opkg" ]; then
+      # distro tracker rule: same OS + release + package (or its binary subpackage) + upstream branch
+      row=$(awk -F'\t' -v i="$inc" -v o="$OS_ID" -v r="$OS_REL" -v p="$opkg" -v sp="$osrc" -v b="$br" '$1=="PKGFIX"&&$2==i&&$3==o&&$4==r&&$6==b&&(p==$5||sp==$5||index(p,$5"-")==1){print $7"\t"$8;exit}' "$D")
+      if [ -n "$row" ]; then
+        fx=$(echo "$row" | cut -f1); adv=$(echo "$row" | cut -f2)
+        if pkgver_lt "$PM" "$over" "$fx"; then res php "$inc" AFFECTED "$pth" "version=$v sapi=$sapi package=$opkg $over < distro fix $fx ($adv)"
+        else res php "$inc" NOT_AFFECTED "$pth" "version=$v sapi=$sapi package=$opkg $over >= distro fix $fx ($adv)"; fi
+        continue
+      fi
+      if [ "$BACKPORT" = 1 ]; then
+        res php "$inc" UNKNOWN "$pth" "needs verification: $OS_ID $OS_REL backports fixes and the definitions have no distro tracker entry for $opkg $over (branch $br); upstream version $v not used"
+        continue
+      fi
+    fi
+    fixed=$(awk -F'\t' -v i="$inc" -v b="$br" '$1=="VB"&&$2==i&&$3=="php"&&$4==b{print $5}' "$D")
+    eolmax=$(awk -F'\t' -v i="$inc" '$1=="EOL"&&$2==i&&$3=="php"{print $4}' "$D")
+    hasvb=$(awk -F'\t' -v i="$inc" '$1=="VB"&&$2==i&&$3=="php"{print 1;exit}' "$D")
+    [ -n "$hasvb$eolmax" ] || continue
+    if [ -n "$fixed" ]; then
+      if ver_lt "$v" "$fixed"; then res php "$inc" AFFECTED "$pth" "version=$v sapi=$sapi fixed=$fixed"
+      else res php "$inc" NOT_AFFECTED "$pth" "version=$v sapi=$sapi fixed=$fixed"; fi
+    elif [ -n "$eolmax" ] && ! ver_lt "$eolmax" "$br"; then
+      res php "$inc" AFFECTED "$pth" "version=$v sapi=$sapi branch $br is end-of-life (no upstream fix)"
+    else
+      res php "$inc" UNKNOWN "$pth" "version=$v sapi=$sapi (branch not covered by definition)"
+    fi
+  done
+}
+PHPBINS="$W/phpbins"; : > "$PHPBINS"
+{ command -v php 2>/dev/null
+  for g in /usr/bin/php* /usr/sbin/php-fpm* /usr/sbin/php*-fpm /usr/local/bin/php* /usr/local/sbin/php-fpm* /opt/*/bin/php* /opt/*/sbin/php-fpm* /opt/remi/*/root/usr/bin/php /opt/remi/*/root/usr/sbin/php-fpm; do
+    [ -f "$g" ] && [ -x "$g" ] && echo "$g"
+  done; } | while read -r b; do
+  case "$b" in *-config|*ize|*.d|*dbg|*-cgi-*) continue ;; esac
+  case "$(basename "$b")" in php|php[0-9]*|php-fpm*|php*-fpm|php-cgi*|php[0-9]*-cgi) : ;; *) continue ;; esac
+  rp=$(readlink -f "$b" 2>/dev/null || echo "$b"); echo "$rp"
+done | sort -u > "$PHPBINS"
+while read -r b; do
+  [ -n "$b" ] || continue
+  # allowlisted read-only call: "<php> -v" (prints version banner only)
+  line=$("$b" -v 2>/dev/null | head -n 1)
+  v=$(echo "$line" | sed -n 's/^PHP \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+  sapi=$(echo "$line" | sed -n 's/.*(\(cli\|fpm-fcgi\|cgi-fcgi\|phpdbg\|litespeed\)).*/\1/p')
+  [ -z "$sapi" ] && sapi=$(echo "$line" | awk '{for(i=1;i<=NF;i++)if($i ~ /^\((cli|fpm-fcgi|cgi-fcgi|litespeed)\)$/){gsub(/[()]/,"",$i);print $i;exit}}')
+  case "$sapi" in fpm-fcgi) sapi=fpm ;; cgi-fcgi) sapi=cgi ;; "") sapi=unknown ;; esac
+  if [ -z "$v" ]; then res php - UNKNOWN "$b" "could not read version (permission denied or not PHP)"; continue; fi
+  php_branch_eval "$b" "$sapi" "$v"
+done < "$PHPBINS"
+# Apache module (mod_php): version from package DB (never loads the module)
+for m in /usr/lib/apache2/modules/libphp*.so /usr/lib64/httpd/modules/libphp*.so /usr/lib/httpd/modules/libphp*.so /usr/lib/apache2/libphp*.so; do
+  [ -f "$m" ] || continue
+  mv_=""
+  case "$PM" in
+    dpkg) pkg=$(dpkg-query -S "$m" 2>/dev/null | head -n1 | cut -d: -f1); [ -n "$pkg" ] && mv_=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null) ;;
+    rpm) mv_=$(rpm -qf --qf '%{VERSION}' "$m" 2>/dev/null) ;;
+    apk) mv_=$(apk info --who-owns "$m" 2>/dev/null | sed -n 's/.* owned by [a-z0-9-]*-\([0-9][0-9.]*\)-r[0-9]*$/\1/p') ;;
+  esac
+  mv_=$(echo "$mv_" | sed -n 's/^\([0-9]*:\)\{0,1\}\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\2/p')
+  if [ -n "$mv_" ]; then php_branch_eval "$m" apache2handler "$mv_"; else res php - UNKNOWN "$m" "sapi=apache2handler version unknown (not in package DB)"; fi
+done
+[ -s "$PHPBINS" ] || ls /usr/lib/apache2/modules/libphp*.so /usr/lib64/httpd/modules/libphp*.so >/dev/null 2>&1 || res php - INFO "-" "no PHP found"
+
+# ---------------------------------------------------------------- OS trust store (US-4)
+BUNDLE=""
+for b in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem; do
+  [ -e "$b" ] && { BUNDLE=$b; break; }
+done
+CA_VER=""
+case "$PM" in
+  dpkg) CA_VER=$(dpkg-query -W -f='${Version}' ca-certificates 2>/dev/null) ;;
+  rpm) CA_VER=$(rpm -q --qf '%{VERSION}-%{RELEASE}' ca-certificates 2>/dev/null) ;;
+  apk) apk info -vv 2>/dev/null > "$W/apkl"
+       CA_VER=$(sed -n 's/^ca-certificates-\([0-9][^ ]*\) - .*/\1/p' "$W/apkl" | head -n1)
+       [ -n "$CA_VER" ] || CA_VER=$(sed -n 's/^ca-certificates-bundle-\([0-9][^ ]*\) - .*/\1/p' "$W/apkl" | head -n1) ;;
+esac
+case "$CA_VER" in *"not installed"*|*"no packages"*) CA_VER="" ;; esac
+pkg_older() { # installed fixed
+  case "$PM" in
+    dpkg) dpkg --compare-versions "$1" lt "$2" ;;
+    apk) [ "$(apk version -t "$1" "$2" 2>/dev/null)" = "<" ] ;;
+    *) ver_lt "$(echo "$1" | tr -c '0-9\n' '.')" "$(echo "$2" | tr -c '0-9\n' '.')" ;;
+  esac
+}
+DISTRUST_INCS=$(awk -F'\t' '$1=="INC"&&($3=="ca_distrust"||$3=="ca_info"){print $2}' "$D")
+if [ -n "$DISTRUST_INCS" ]; then
+  if [ -z "$BUNDLE" ]; then
+    res os_ca - UNKNOWN "-" "system CA bundle not found"
+  elif [ ! -r "$BUNDLE" ]; then
+    res os_ca - UNKNOWN "$BUNDLE" "permission denied: $BUNDLE"
+  elif [ "$HAVE_OPENSSL" = 0 ]; then
+    res os_ca - UNKNOWN "$BUNDLE" "openssl not found"
+  else
+    bundle_fps "$BUNDLE" > "$W/osfps"; cp "$W/cache.$h.cns" "$W/oscns"
+    match_fps "$W/osfps" os_ca > "$W/osm"
+    for inc in $DISTRUST_INCS; do
+      note=""
+      fixed=$(awk -F'\t' -v i="$inc" -v p="$PM" '$1=="PKGMIN"&&$2==i&&$3==p&&$4=="ca-certificates"{print $5}' "$D")
+      if [ -n "$fixed" ] && [ -n "$CA_VER" ] && pkg_older "$CA_VER" "$fixed"; then note="; package older than fixed version ($CA_VER < $fixed)"; fi
+      hits=$(awk -F'\t' -v i="$inc" '$1==i{print $2}' "$W/osm" | paste -sd ';' -)
+      if [ -n "$hits" ]; then res os_ca "$inc" AFFECTED "$BUNDLE" "contains: $hits; ca-certificates=${CA_VER:-unknown}$note"
+      else res os_ca "$inc" NOT_AFFECTED "$BUNDLE" "ca-certificates=${CA_VER:-unknown}$note"; fi
+    done
+  fi
+fi
+
+# ---------------------------------------------------------------- language stores (US-3)
+if [ -n "$DISTRUST_INCS" ]; then
+  # Python certifi (bounded search, no filesystem crossing)
+  for root in $SCAN_ROOTS; do
+    [ -d "$root" ] || continue
+    find "$root" -xdev -maxdepth 8 -type f -name cacert.pem -path '*certifi*' 2>/dev/null
+  done | sort -u > "$W/certifi"
+  while read -r f; do
+    [ -n "$f" ] || continue
+    if [ ! -r "$f" ]; then res certifi - UNKNOWN "$f" "permission denied: $f"; continue; fi
+    if [ "$HAVE_OPENSSL" = 0 ]; then res certifi - UNKNOWN "$f" "openssl not found"; continue; fi
+    bundle_fps "$f" > "$W/cfps"; match_fps "$W/cfps" certifi > "$W/cm"
+    for inc in $DISTRUST_INCS; do
+      hits=$(awk -F'\t' -v i="$inc" '$1==i{print $2}' "$W/cm" | paste -sd ';' -)
+      if [ -n "$hits" ]; then res certifi "$inc" AFFECTED "$f" "contains: $hits"; else res certifi "$inc" NOT_AFFECTED "$f" ""; fi
+    done
+  done < "$W/certifi"
+  # Java cacerts
+  for j in /etc/ssl/certs/java/cacerts /etc/pki/java/cacerts /usr/lib/jvm/*/lib/security/cacerts /usr/lib/jvm/*/jre/lib/security/cacerts /opt/*/lib/security/cacerts; do
+    [ -f "$j" ] || continue
+    rj=$(readlink -f "$j" 2>/dev/null || echo "$j")
+    grep -qxF "$rj" "$W/javaseen" 2>/dev/null && continue; echo "$rj" >> "$W/javaseen"
+    if [ ! -r "$rj" ]; then res java - UNKNOWN "$rj" "permission denied: $rj"; continue; fi
+    if ! have keytool; then res java - UNKNOWN "$rj" "keytool not found"; continue; fi
+    # changeit is the public default store password used to list (read-only)
+    keytool -list -keystore "$rj" -storepass changeit 2>/dev/null | sed -n 's/.*(SHA-256): *//p' | tr -d ': ' | awk '{print $0"\t-"}' > "$W/jfps"
+    if [ ! -s "$W/jfps" ]; then res java - UNKNOWN "$rj" "keytool could not list store"; continue; fi
+    match_fps "$W/jfps" java > "$W/jm"
+    for inc in $DISTRUST_INCS; do
+      hits=$(awk -F'\t' -v i="$inc" '$1==i{print $2}' "$W/jm" | paste -sd ';' -)
+      if [ -n "$hits" ]; then res java "$inc" AFFECTED "$rj" "contains: $hits"; else res java "$inc" NOT_AFFECTED "$rj" ""; fi
+    done
+  done
+  # Node: roots embedded in binary
+  if have node; then
+    nv=$(node --version 2>/dev/null | sed 's/^v//')
+    nr=$(awk -F'\t' '$1=="NODE"{print; exit}' "$D")
+    if [ -z "$nr" ]; then res node - UNKNOWN "$(command -v node)" "node=$nv embedded store: version-match only (no Node rule in definitions)"
+    else
+      awk -F'\t' '$1=="NODE"{print $2"\t"$3"\t"$4}' "$D" | while IFS="$TAB" read -r inc br fx; do
+        case "$nv" in "$br".*|"$br") if ver_lt "$nv" "$fx"; then res node "$inc" AFFECTED "$(command -v node)" "node=$nv embedded store: version-match only, fixed=$fx"; else res node "$inc" NOT_AFFECTED "$(command -v node)" "node=$nv embedded store: version-match only"; fi ;;
+        esac
+      done
+    fi
+  fi
+  res go - INFO "-" "Go and rustls/webpki-roots apps carry compiled-in roots; they are not scanned. Rebuild them or get an update from the vendor."
+fi
+
+# ---------------------------------------------------------------- deployed leaf certs (US-5)
+if [ -n "$DISTRUST_INCS" ]; then
+  LEAVES="$W/leaves"; : > "$LEAVES"   # path \t referencing-config
+  for c in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/* /etc/apache2/sites-enabled/* /etc/apache2/conf-enabled/* /etc/httpd/conf/httpd.conf /etc/httpd/conf.d/*.conf /etc/haproxy/haproxy.cfg /etc/postfix/main.cf; do
+    if [ ! -f "$c" ] || [ ! -r "$c" ]; then continue; fi
+    sed 's/#.*//' "$c" | awk -v cf="$c" '
+      $1=="ssl_certificate"||$1=="SSLCertificateFile"||$1=="SSLCertificateChainFile"{p=$2; gsub(/[;"]/,"",p); print p"\t"cf}
+      $1 ~ /^smtpd_tls_cert_file/ {sub(/.*=[ \t]*/,""); print $1"\t"cf}
+      /^[ \t]*bind / {for(i=1;i<NF;i++) if($i=="crt") print $(i+1)"\t"cf}' >> "$LEAVES"
+  done
+  for f in /etc/letsencrypt/live/*/fullchain.pem /etc/letsencrypt/live/*/cert.pem /etc/ssl/*.pem /etc/ssl/*.crt /etc/pki/tls/certs/*.crt /etc/pki/tls/certs/*.pem; do
+    [ -f "$f" ] || continue
+    case "$f" in */ca-bundle*|*/ca-certificates.crt|/etc/ssl/cert.pem) continue ;; esac
+    awk -F'\t' -v f="$f" '$1==f{found=1} END{exit !found}' "$LEAVES" || printf '%s\tunreferenced\n' "$f" >> "$LEAVES"
+  done
+  # issuer subjects present in the system bundle (direct-root issuance check)
+  if [ -f "$W/oscns" ]; then sort -u "$W/oscns" > "$W/rootsubj"; fi
+  sort -u "$LEAVES" | while IFS="$TAB" read -r lf cf; do
+    [ -n "$lf" ] || continue
+    if [ ! -e "$lf" ]; then continue; fi
+    if [ ! -r "$lf" ]; then res leaf - UNKNOWN "$lf" "permission denied: $lf (ref: $cf)"; continue; fi
+    # never parse private keys: peek at most 64 bytes of the header
+    if head -c 64 "$lf" 2>/dev/null | grep -q 'PRIVATE KEY'; then continue; fi
+    if [ "$HAVE_OPENSSL" = 0 ]; then res leaf - UNKNOWN "$lf" "openssl not found"; continue; fi
+    rm -rf "$W/lsplit"; split_pem "$lf" "$W/lsplit"
+    first="$W/lsplit/0001.pem"; [ -f "$first" ] || continue
+    openssl x509 -in "$first" -noout -subject -enddate -nameopt RFC2253 > "$W/lmeta" 2>/dev/null
+    cn=$(sed -n 's/^subject=.*CN=\([^,]*\).*/\1/p' "$W/lmeta")
+    na=$(sed -n 's/^notAfter=//p' "$W/lmeta")
+    : > "$W/lchain"
+    for p in "$W/lsplit"/*.pem; do
+      openssl x509 -in "$p" -noout -fingerprint -sha256 -issuer -nameopt RFC2253 2>/dev/null > "$W/lc1"
+      printf '%s\t%s\n' "$(norm_fp < "$W/lc1")" "$(sed -n 's/^issuer=//p' "$W/lc1")" >> "$W/lchain"
+    done
+    topiss=$(tail -n 1 "$W/lchain" | cut -f2)
+    ref="ref: $cf"
+    for inc in $DISTRUST_INCS; do
+      hit=$(match_fps "$W/lchain" leaf_chain | awk -F'\t' -v i="$inc" '$1==i{print $2;exit}')
+      if [ -z "$hit" ]; then
+        hit=$(awk -F'\t' -v i="$inc" '$1=="ICN"&&$2==i{print $3}' "$D" | while read -r n; do
+          cut -f2 "$W/lchain" | grep -F "CN=$n" >/dev/null && { echo "$n"; break; }; done)
+      fi
+      if [ -n "$hit" ]; then res leaf "$inc" AFFECTED "$lf" "CN=$cn notAfter=$na chains to $hit; $ref"
+      elif [ "$(wc -l < "$W/lchain")" -gt 1 ] || grep -qxF "$(echo "$topiss" | sed -n 's/.*CN=\([^,]*\).*/\1/p')" "$W/rootsubj" 2>/dev/null; then res leaf "$inc" NOT_AFFECTED "$lf" "CN=$cn notAfter=$na; $ref"
+      else res leaf "$inc" UNKNOWN "$lf" "CN=$cn notAfter=$na (chain incomplete); $ref"; fi
+    done
+  done
+fi
+
+# ---------------------------------------------------------------- rank (US-6)
+VERDICT=OK; CODE=0
+if grep -q "${TAB}AFFECTED${TAB}" "$R"; then
+  if awk -F'\t' 'NR==FNR{if($1=="INC"&&$3=="runtime_cve")k[$2]=1;next} $3=="AFFECTED"&&($2 in k){f=1} END{exit !f}' "$D" "$R"; then VERDICT="PATCH FIRST"; CODE=20
+  else VERDICT="ROTATE FIRST"; CODE=10; fi
+elif grep -q "${TAB}UNKNOWN${TAB}" "$R"; then VERDICT=UNKNOWN; CODE=30; fi
+# ordered affected incidents: runtime_cve first, then severity_rank, then id
+awk -F'\t' 'NR==FNR{if($1=="INC"){k[$2]=($3=="runtime_cve")?0:1;s[$2]=$4;t[$2]=$6};next} $3=="AFFECTED"&&!seen[$2]++{printf "%d\t%06d\t%s\t%s\n",k[$2],s[$2],$2,t[$2]}' "$D" "$R" | sort > "$W/order"
+remkey() { echo "$PM"; }
+
+# ---------------------------------------------------------------- output
+if [ "$JSON" = 1 ]; then
+  jesc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\037'; }
+  printf '{"tool":"blastradius","checker_version":"%s","generated_at":"%s",' "$BR_VERSION" "$NOW"
+  printf '"definitions":{"version":"%s","published_at":"%s","source":"%s","signature_verified":%s},' "$DEF_VER" "$DEF_PUB" "$(jesc "$DEFSRC")" "$([ "$SIGNED" = 1 ] && echo true || echo false)"
+  printf '"host":{'; [ "$INC_HOST" = 1 ] && printf '"hostname":"%s",' "$(jesc "$HOSTNAME_V")"
+  printf '"os_id":"%s","os_version":"%s","package_manager":"%s","ca_certificates_version":"%s","ca_bundle":"%s"},' "$(jesc "$OS_ID")" "$(jesc "$OS_VER")" "$PM" "$(jesc "$CA_VER")" "$(jesc "$BUNDLE")"
+  printf '"verdict":"%s","exit_code":%d,"checks":[' "$VERDICT" "$CODE"
+  first=1
+  while IFS="$TAB" read -r sec inc st subj det; do
+    [ "$first" = 1 ] || printf ','; first=0
+    printf '{"section":"%s","incident":"%s","status":"%s","subject":"%s","detail":"%s"}' "$sec" "$(jesc "$inc")" "$st" "$(jesc "$subj")" "$(jesc "$det")"
+  done < "$R"
+  printf '],"actions":['
+  first=1; n=0
+  while IFS="$TAB" read -r _k _s inc title; do
+    n=$((n+1)); [ "$first" = 1 ] || printf ','; first=0
+    printf '{"rank":%d,"incident":"%s","title":"%s","commands":[' "$n" "$inc" "$(jesc "$title")"
+    awk -F'\t' -v i="$inc" -v p="$(remkey)" '$1=="REM"&&$2==i&&($3==p||$3=="any"){print $4}' "$D" | { f2=1; while read -r cmd; do [ "$f2" = 1 ] || printf ','; f2=0; printf '"%s"' "$(jesc "$cmd")"; done; }
+    printf ']}'
+  done < "$W/order"
+  printf ']}\n'
+  exit "$CODE"
+fi
+
+if [ "$COLOR" = 1 ]; then B=$(printf '\033[1m'); RS=$(printf '\033[0m'); else B=""; RS=""; fi
+echo "BlastRadius $BR_VERSION  (read-only; nothing on this host was changed)"
+echo "generated: $NOW"
+echo "definitions: v$DEF_VER published $DEF_PUB ($DEFSRC)$([ "$SIGNED" = 1 ] && echo ", signature OK" || echo ", SIGNATURE NOT VERIFIED: openssl missing")"
+echo "host: ${HOSTNAME_V:+$HOSTNAME_V }os=$OS_ID $OS_VER pkg=$PM ca-certificates=${CA_VER:-unknown} bundle=${BUNDLE:-none}"
+echo
+echo "${B}VERDICT: $VERDICT${RS}"
+echo
+for sec in php os_ca certifi java node leaf go; do
+  awk -F'\t' -v s="$sec" '$1==s' "$R" | while IFS="$TAB" read -r _s inc st subj det; do
+    case "$st" in
+      AFFECTED) line="AFFECTED $inc" ;; NOT_AFFECTED) line="NOT AFFECTED $inc" ;; UNKNOWN) line="UNKNOWN ($det)"; det="" ;; INFO) line="NOTE${inc:+ $inc}"; [ "$inc" = - ] && line=NOTE ;;
+    esac
+    case "$sec" in leaf) [ "${det##*ref: }" = unreferenced ] && det="$det [unreferenced]" ;; esac
+    printf '%-8s %s  %s%s\n' "$sec:" "$line" "$subj" "${det:+  [$det]}"
+  done
+done
+echo
+if [ -s "$W/order" ]; then
+  echo "ACTIONS (in order; BlastRadius never runs these for you):"
+  n=0
+  while IFS="$TAB" read -r _k _s inc title; do
+    n=$((n+1)); echo "$n. [$inc] $title"
+    awk -F'\t' -v i="$inc" -v p="$(remkey)" '$1=="REM"&&$2==i&&($3==p||$3=="any"){print "     " $4}' "$D"
+    for st in certifi java leaf; do
+      if awk -F'\t' -v i="$inc" -v s="$st" '$1==s&&$2==i&&$3=="AFFECTED"{f=1} END{exit !f}' "$R"; then
+        awk -F'\t' -v i="$inc" -v s="$st" '$1=="REM"&&$2==i&&$3==s{print "     " $4}' "$D"
+        awk -F'\t' -v i="$inc" -v s="$st" '$1==s&&$2==i&&$3=="AFFECTED"{print "       -> " $4}' "$R"
+      fi
+    done
+  done < "$W/order"
+fi
+if [ "$VERDICT" = UNKNOWN ]; then
+  echo "UNKNOWN checks (could not decide):"
+  awk -F'\t' '$3=="UNKNOWN"{print "  - " $1 ": " $4 ": " $5}' "$R"
+fi
+exit "$CODE"

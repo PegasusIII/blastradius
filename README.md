@@ -1,5 +1,7 @@
 # BlastRadius (experiment build)
 
+> **Want fleet-wide checks and alerts?** Join the BlastRadius Pro waitlist ($9): https://tally.so/r/OQQDr7
+
 **Is this host exposed to this week's incident, and what do I fix first?**
 
 BlastRadius is a small, read-only POSIX shell script. Run it on a Linux host as a normal user. It checks:
